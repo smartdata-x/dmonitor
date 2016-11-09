@@ -14,50 +14,61 @@ class Group:
                nosuffixflag=0, nosuffix_db=0, nosuffix_period=0, nosuffix_table=[]):
     self.chargename = chargename
     self.phone = phone
-    time ='init_time'
-    if suffixflag:  # 有后缀
-      if suffix_period == 24:  # 每天
-        time = GetYesterday()
-      elif suffix_period == 1: # 每小时
-        time = GetLastTwoHour()
-      elif suffix_period == 7: # 每周一
-        time = GetLastMonday()
-      elif suffix_period == 30: # 每月
-        time = GetLastMonthFristDay()
-      elif suffix_period == 5:  # 交易日
-        time = GetToday()
+    if suffixflag:
       self.suffixflag = suffixflag
       self.suffix_db = suffix_db
       self.suffix_period = suffix_period
       self.suffix_table = []
-      
       for each in suffix_table: 
-        self.suffix_table.append(each + str(time))
+        self.suffix_table.append(each)
       if not nosuffixflag:
         self.nosuffixflag = 0
 
-    if nosuffixflag: # 无后缀
+    if nosuffixflag:
       self.nosuffixflag = nosuffixflag
       self.nosuffix_db = nosuffix_db
       self.nosuffix_period = nosuffix_period
       self.nosuffix_table = []
-      
       for each in nosuffix_table:  
         self.nosuffix_table.append(each)
       if not suffixflag:
         self.suffixflag = 0
 
+  def SetTime(self):
+    time ='init_time'
+    if self.suffixflag:  # 有后缀
+      if self.suffix_period == 24:  # 每天
+        time = GetYesterday()
+      elif self.suffix_period == 1: # 每小时
+        time = GetLastTwoHour()
+      elif self.suffix_period == 7: # 每周一
+        time = GetLastMonday()
+      elif self.suffix_period == 30: # 每月
+        time = GetLastMonthFristDay()
+      elif self.suffix_period == 5:  # 交易日
+        time = GetToday()
+
+      self.check_suffix_table = []
+      for each in self.suffix_table: 
+        self.check_suffix_table.append(each + str(time))
+
+    if self.nosuffixflag: # 无后缀
+      self.check_nosuffix_table = []
+      for each in self.nosuffix_table:
+        self.check_nosuffix_table.append(each)
+
   def CheckList(self):
+    self.SetTime()
     self.errorlist = []    # 更新失误列表
     if self.suffixflag:    # 有后缀
       r = connect_redis(self.suffix_db)
-      for eachtable in self.suffix_table:
+      for eachtable in self.check_suffix_table:
         ret = r.exists(eachtable)
         if ret == False:
           self.AddErrorKey(eachtable)
     if self.nosuffixflag:  # 无后缀
       r = connect_redis(self.nosuffix_db)
-      for eachtable in self.nosuffix_table:
+      for eachtable in self.check_nosuffix_table:
         ret = r.exists(eachtable)
         if ret == False:
           self.AddErrorKey(eachtable)
@@ -96,7 +107,7 @@ def GetYesterday(timeflag=0):
     # timeflag = 1 时，20161101格式
   today = datetime.date.today() 
   oneday = datetime.timedelta(days=1) 
-  yesterday = today-oneday  
+  yesterday = today - oneday  
   return yesterday.strftime('%Y-%m-%d') 
 
 def GetLastTwoHour():
@@ -238,6 +249,7 @@ def main():
           pass
         else:
           send_sms(group.chargename, group.phone, group.errorlist, '前两小时')
+          time.sleep(30)
           send_sms('', '18668169052', group.errorlist, '前两小时')
         time.sleep(2) #发送短信间隔2s
 
@@ -245,6 +257,7 @@ def main():
       for group in GroupDay:
         group.CheckList()
         send_sms(group.chargename, group.phone, group.errorlist, '昨日')
+        time.sleep(30)
         if group.errorlist:
           send_sms('', '18668169052', group.errorlist, '昨日')
         time.sleep(300) 
@@ -254,6 +267,7 @@ def main():
         for group in GroupWorkDay:
           group.CheckList()
           send_sms(group.chargename, group.phone, group.errorlist, '今日')
+          time.sleep(30)
           if group.errorlist:
             send_sms('', '18668169052', group.errorlist, '今日')
           time.sleep(2)
@@ -262,6 +276,7 @@ def main():
       for group in GroupWeek:
         group.CheckList()
         send_sms(group.chargename, group.phone, group.errorlist, '上周一')
+        time.sleep(30)
         if group.errorlist:
           send_sms('', '18668169052', group.errorlist, '上周一')        
         time.sleep(2)
@@ -270,6 +285,7 @@ def main():
       for group in GroupMonth:
         group.CheckList()
         send_sms(group.chargename, group.phone, group.errorlist, '上月一日')
+        time.sleep(30)
         if group.errorlist:
           send_sms('', '18668169052', group.errorlist, '上月一日') 
         time.sleep(2)
